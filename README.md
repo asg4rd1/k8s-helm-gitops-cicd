@@ -128,9 +128,56 @@ minikube service flask-app --url
 
 ## Phase 4 — GitHub Actions (coming soon)
 
-A CI/CD workflow will automate the full pipeline: build → push → deploy on every `git push`.
+The goal is to have a fully automated GitOps pipeline using a real remote cluster.
 
----
+**Workflow:**
+git push
+↓
+GitHub Actions triggers
+├── Build Docker image
+├── Push to Docker Hub
+└── helm upgrade → EC2 (k3s) → updated pod
+
+For this, a t2.micro EC2 instance running k3s acts as the Kubernetes cluster.
+GitHub Actions authenticates against it via kubeconfig stored as a GitHub secret.
+
+To achieve this we will have to follow the following steps:
+
+first install k3s in our ec2 instace:
+
+ssh ec2-user@IP -i k3s-key.pem
+curl -sfL https://get.k3s.io | sh -
+
+verify if installation has been done successfully
+sudo kubectl get nodes
+
+get kubeconfig to achieve github connect to our k3s cluster
+sudo cat /etc/rancher/k3s/k3s.yaml
+
+We will have to change one line before save the kubeconfig,
+This line is server: https://127.0.0.1:6443
+We need to change the localhost for our ec2 public IP 
+
+When we have the kubeconfig configured, we will configure the github secrets in our repository,
+These will be kubeconfig docker username and password, each in one secret.
+Github - Repository settings - Secrets and variables - New secret.
+
+Finally we have to deploy the file that we will use github actions to follow the workflow:
+The steps would be:
+Push to main
+Start VM Ubuntu 
+Download the code
+Docker Hub Log in
+Buildand upload the image
+Connect to your EC2 and k3s cluster
+Deploy with Helm
+
+
+errores que han surgido:
+
+t2 micro demasiado poco potente para correr un pod
+al generar el kubeconfig se tiene que anadir un parametro para que sea valido con la ip publica
+
 
 ## Stack
 
