@@ -124,60 +124,86 @@ kubectl get pods
 minikube service flask-app --url
 ```
 
+---
 
-
-## Phase 4 — GitHub Actions (coming soon)
+## Phase 4 — GitHub Actions
 
 The goal is to have a fully automated GitOps pipeline using a real remote cluster.
 
 **Workflow:**
+
+```
 git push
-↓
+    ↓
 GitHub Actions triggers
-├── Build Docker image
-├── Push to Docker Hub
-└── helm upgrade → EC2 (k3s) → updated pod
+    ├── Build Docker image
+    ├── Push to Docker Hub
+    └── helm upgrade → EC2 (k3s) → updated pod
+```
 
-For this, a t2.micro EC2 instance running k3s acts as the Kubernetes cluster.
-GitHub Actions authenticates against it via kubeconfig stored as a GitHub secret.
+A **t3.small EC2 instance** running k3s acts as the Kubernetes cluster. GitHub Actions authenticates against it via a kubeconfig stored as a GitHub secret.
 
-To achieve this we will have to follow the following steps:
+### 1. Provision the EC2 instance
 
-first install k3s in our ec2 instace:
+Launch a t3.small Ubuntu 22.04 instance with the following inbound rules:
+- Port 22 (SSH)
+- Port 6443 (Kubernetes API)
 
-ssh ec2-user@IP -i k3s-key.pem
-curl -sfL https://get.k3s.io | sh -
+### 2. Install k3s
 
-verify if installation has been done successfully
-sudo kubectl get nodes
+The `--tls-san` flag adds the EC2 public IP to the certificate, which is required for remote access:
 
-get kubeconfig to achieve github connect to our k3s cluster
+```bash
+ssh -i k3s-key.pem ec2-user@<EC2-PUBLIC-IP>
+curl -sfL https://get.k3s.io | sh -s - --tls-san <EC2-PUBLIC-IP>
+sudo k3s kubectl get nodes
+```
+
+### 3. Configure the kubeconfig
+
+Get the kubeconfig and replace the default `127.0.0.1` with the EC2 public IP:
+
+```bash
 sudo cat /etc/rancher/k3s/k3s.yaml
+# Replace: server: https://127.0.0.1:6443
+# With:    server: https://<EC2-PUBLIC-IP>:6443
+```
 
-We will have to change one line before save the kubeconfig,
-This line is server: https://127.0.0.1:6443
-We need to change the localhost for our ec2 public IP 
+### 4. Add GitHub secrets
 
-When we have the kubeconfig configured, we will configure the github secrets in our repository,
-These will be kubeconfig docker username and password, each in one secret.
-Github - Repository settings - Secrets and variables - New secret.
+Go to **Repository → Settings → Secrets and variables → Actions** and create:
 
-Finally we have to deploy the file that we will use github actions to follow the workflow:
-The steps would be:
-Push to main
-Start VM Ubuntu 
-Download the code
-Docker Hub Log in
-Buildand upload the image
-Connect to your EC2 and k3s cluster
-Deploy with Helm
+| Secret | Value |
+|--------|-------|
+| `KUBECONFIG_DATA` | Contents of the kubeconfig with the public IP |
+| `DOCKERHUB_USERNAME` | Your Docker Hub username |
+| `DOCKERHUB_TOKEN` | Docker Hub access token (Account Settings → Security) |
 
+### 5. Push to main
 
-errores que han surgido:
+Any push to `main` will trigger the workflow automatically. The pipeline will:
 
-t2 micro demasiado poco potente para correr un pod
-al generar el kubeconfig se tiene que anadir un parametro para que sea valido con la ip publica
+1. Check out the code
+2. Log in to Docker Hub
+3. Build and push the Docker image tagged with the commit SHA
+4. Install Helm on the runner
+5. Configure the kubeconfig from the GitHub secret
+6. Run `helm upgrade --install` against the k3s cluster
 
+Verify the deployment from the EC2:
+
+```bash
+sudo k3s kubectl get pods
+# flask-app-xxxxxxxxx   1/1   Running   0   Xs
+```
+
+### Notes
+
+- A **t2.micro** (1GB RAM) is not sufficient to run k3s and application pods simultaneously. Use **t3.small** (2GB) or larger.
+- The EC2 public IP changes on every restart. Assign an **Elastic IP** to avoid having to regenerate the kubeconfig on each reboot.
+- If the IP changes, the k3s TLS certificate must be regenerated: stop k3s, remove `/var/lib/rancher/k3s/server/tls`, and reinstall with the new `--tls-san`.
+
+---
 
 ## Stack
 
@@ -185,3 +211,4 @@ al generar el kubeconfig se tiene que anadir un parametro para que sea valido co
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?logo=kubernetes&logoColor=white)
 ![Helm](https://img.shields.io/badge/Helm-0F1689?logo=helm&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?logo=amazonaws)
