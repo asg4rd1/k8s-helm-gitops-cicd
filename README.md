@@ -202,8 +202,46 @@ sudo k3s kubectl get pods
 - A **t2.micro** (1GB RAM) is not sufficient to run k3s and application pods simultaneously. Use **t3.small** (2GB) or larger.
 - The EC2 public IP changes on every restart. Assign an **Elastic IP** to avoid having to regenerate the kubeconfig on each reboot.
 - If the IP changes, the k3s TLS certificate must be regenerated: stop k3s, remove `/var/lib/rancher/k3s/server/tls`, and reinstall with the new `--tls-san`.
+```bash
+sudo systemctl stop k3s
+sudo rm -rf /var/lib/rancher/k3s/server/tls
+sudo bash -c 'cat > /etc/rancher/k3s/config.yaml << EOF
+tls-san:
+  - 
+EOF'
+sudo systemctl start k3s
+```
 
 ---
+
+### 6. Ingress Configuration
+
+To avoid reconfiguring secrets every time the EC2 instance restarts, I assigned an Elastic IP to the instance.
+
+Next, I updated the Service type from `NodePort` to `ClusterIP`, so the pod is only accessible internally within the cluster. External traffic is now handled exclusively through the Ingress.
+
+**Important:** k3s ships with Traefik as the default Ingress Controller instead of Nginx. Verify it is running:
+
+```bash
+sudo kubectl get pods -n kube-system | grep traefik
+```
+
+To regenerate k3s certificates after an IP change:
+
+```bash
+sudo systemctl stop k3s
+sudo rm -rf /var/lib/rancher/k3s/server/tls
+sudo bash -c 'cat > /etc/rancher/k3s/config.yaml << EOF
+tls-san:
+  - 
+EOF'
+sudo systemctl start k3s
+```
+
+After testing the Ingress manually, I moved the configuration into the Helm chart under `helm/flask-app/templates/ingress.yaml` so it gets deployed automatically via GitHub Actions on every push to main.
+
+
+
 
 ## Stack
 

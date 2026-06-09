@@ -6,6 +6,12 @@ image:
   pullPolicy: Never
 
 service:
-  type: NodePort
+  type: ClusterIp
   port: 80
   targetPort: 5000
+
+ingress:
+  enabled: true
+  className: traefik
+  path: /
+  pathType: Prefix
