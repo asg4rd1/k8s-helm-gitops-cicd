@@ -240,7 +240,7 @@ sudo systemctl start k3s
 
 After testing the Ingress manually, I moved the configuration into the Helm chart under `helm/flask-app/templates/ingress.yaml` so it gets deployed automatically via GitHub Actions on every push to main.
 
-
+### 7 Sonarqube analysis configured
 
 
 ## Stack
