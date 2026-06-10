@@ -242,6 +242,8 @@ After testing the Ingress manually, I moved the configuration into the Helm char
 
 ### 7 Sonarqube analysis configured
 
+Added a new secret into Github Secret named SONAR_TOKEN
+
 
 ## Stack
 
