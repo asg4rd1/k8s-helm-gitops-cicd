@@ -16,5 +16,6 @@ spec:
       - name: flask-app
         image: flask-app:v1
         imagePullPolicy: Never
+        automountServiceAccountToken: false
         ports:
         - containerPort: 5000
